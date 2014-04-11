@@ -82,10 +82,12 @@ type Query struct {
 func db() {
 	println("[Starting] db() ......")
 
+	// The data
 	clients := make(map[uint]*Client)
 	clientTokens := make(map[string]*Client)
 	rooms := make(map[uint]*Room)
 	roomNames := [...]string{"Japan", "China", "U.S.", "Russia", "U.K."} // tmp variable
+	
 	for id, name := range roomNames {
 		room := &Room{
 			id		: uint(id),
@@ -122,23 +124,27 @@ func db() {
 				clients[client.id] = client
 				println("[Q_ONLINE] got it")
 			}
+			
 			data = client
 			
 		case Q_OFFLINE:
 			client := query.params.(*Client)
-			for _, room := range client.rooms {
+			for rid, room := range client.rooms {
 				delete(room.members, client.id)
+				msg := map[string]interface{} {
+					"path": "presence",
+					"action": "leave",
+					"to_type": TYPE_MAP[T_ROOM],
+					"to_id": rid,
+					"member": map[string]interface{} {
+						"oid": client.id,
+					},
+				}
+				for _, member := range room.members {
+					member.mailbox <- msg
+				}
 			}
 			delete(clients, client.id)
-			
-			msg := map[string]interface{} {
-				"path": "presence",
-				"action": "offline",
-				"member": map[string]interface{} {
-					"oid": client.id,
-				},
-			}
-			client.mailbox <- msg
 			
 		case Q_ROOMS:
 			idx := 0
@@ -190,18 +196,24 @@ func db() {
 			client := params["client"].(*Client)
 			room := rooms[rid]
 			client.rooms[rid] = room
-			room.members[client.id] = client
 			fmt.Printf("[Q_JOIN] rooms[rid].members: %v\n", rooms[rid].members)
-			
-			msg := map[string]interface{} {
-				"path": "presence",
-				"action": "join",
-				"member": map[string]interface{} {
-					"oid": client.id,
-					"name": client.name,
-				},
+
+			members := room.members
+			for _, member := range members {
+				msg := map[string]interface{} {
+					"path": "presence",
+					"action": "join",
+					"to_type": TYPE_MAP[T_ROOM],
+					"to_id": rid,
+					"member": map[string]interface{} {
+						"oid": client.id,
+						"name": client.name,
+					},
+				}
+				member.mailbox <- msg
 			}
-			client.mailbox <- msg
+			members[client.id] = client
+
 			
 		case Q_LEAVE:
 			params := query.params.(map[string]interface{})
@@ -266,7 +278,7 @@ func db() {
 		
 		println("[End query]!", query.action)
 	}
-	println(">>> Database closed !!!!!! Why???")
+	println(">>> Database closed !!!!!! But why???")
 }
 
 /* ============================================================================
@@ -374,7 +386,7 @@ func ChatHandler(ws *websocket.Conn) {
 	mailbox := make(chan map[string]interface{}, 2)
 	go func() {
 		for msg := range mailbox {
-			fmt.Printf("[Mailbox]: %v\n", msg)
+			fmt.Printf("[Mailbox]: %d, %v\n", client.id, msg)
 			path := msg["path"].(string)
 			switch path {
 			case "message":

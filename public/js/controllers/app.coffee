@@ -128,11 +128,14 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
             when 'presence'
                 switch data.to_type
                     when 'room'
+                        console.log "OLD::", $scope.members
                         switch data.action
                             when 'join'
                                 $scope.members[data.to_id][data.member.oid] = data.member
+                                console.log "NEW::", $scope.members
                             when 'leave'
                                 delete $scope.members[data.to_id][data.member.oid]
+                        
             when 'message'
                 switch data.to_type
                     when 'room'

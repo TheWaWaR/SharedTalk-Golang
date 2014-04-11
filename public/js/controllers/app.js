@@ -175,9 +175,11 @@
           case 'presence':
             switch (data.to_type) {
               case 'room':
+                console.log("OLD::", $scope.members);
                 switch (data.action) {
                   case 'join':
                     $scope.members[data.to_id][data.member.oid] = data.member;
+                    console.log("NEW::", $scope.members);
                     break;
                   case 'leave':
                     delete $scope.members[data.to_id][data.member.oid];
