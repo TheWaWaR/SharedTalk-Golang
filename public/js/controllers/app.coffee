@@ -1,5 +1,21 @@
 
+initTabs = () ->
+    $("#room-tabs a").click (e) ->
+        e.preventDefault()
+        $(this).tab "show"
 
+    $("#room-tabs a:first").tab "show";
+    console.log "show first"
+
+    
+showTab = (selector) ->
+    $(selector).addClass "hide"
+    
+hideTab = (selector) ->
+    $(selector).removeClass "hide"
+
+
+# Angular things
 ws = null
 chatApp = angular.module "chatApp", []
 
@@ -33,6 +49,7 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
     $scope.history = {}
     $scope.users = {}
     $scope.visitors = {}
+    $scope.currentRid = null
 
     $scope.send = (type, oid) ->
         # body = $('#message-input-'+id).val()
@@ -43,6 +60,11 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
             ws.send (JSON.stringify msg)
             # $('#message-input-'+id).val ""
             this.text = ""
+
+    $scope.showTab = (rid) ->
+        $scope.currentRid = rid
+        showTab "#rtab-#{$scope.currentRid} .notifier"
+        return
 
     ChatService.setOnopen () ->
         token = $.cookie('token')
@@ -84,6 +106,10 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
                     msg = {path: 'join', oid: room.oid}
                     ws.send (JSON.stringify msg)
                 console.log 'rooms:', $scope.rooms
+                for room in data.rooms
+                    $scope.currentRid = room.oid
+                    break
+                    
             when 'join'
                 msg = {path: 'members', oid: data.oid}
                 ws.send (JSON.stringify msg)
@@ -98,6 +124,7 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
             when 'history'
                 $scope.history[data.oid] = data.messages
                 console.log 'Get history:', data.oid, data.messages
+                do initTabs
             when 'presence'
                 switch data.to_type
                     when 'room'
@@ -110,6 +137,8 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
                 switch data.to_type
                     when 'room'
                         console.log 'received message:', data
+                        if data.to_id != $scope.currentRid
+                            hideTab "#rtab-#{data.to_id} .notifier"
                         $scope.history[data.to_id].push data
                         # $('#room-'+data.oid).append "#{data.from}: #{data.body}<br />"
                 console.log 'Message.type:', data.to_type

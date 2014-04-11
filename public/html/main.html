@@ -8,7 +8,9 @@
 
       <ul id="room-tabs" class="nav nav-tabs" style="margin-bottom: 20px;">
         <li ng-repeat="room in rooms">
-          <a href="#room-{{room.oid}}" data-toggle="tab">{{room.name}}</a>
+          <a id="rtab-{{room.oid}}" href="#room-{{room.oid}}" data-toggle="tab" ng-click="showTab(room.oid)">
+            {{room.name}} ({{ history[room.oid].length}}<span class="notifier hide">*</span>)
+          </a>
         </li>
       </ul>
 
