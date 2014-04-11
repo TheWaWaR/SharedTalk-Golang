@@ -87,7 +87,13 @@ func db() {
 	rooms := make(map[uint]*Room)
 	roomNames := [...]string{"Japan", "China", "U.S.", "Russia", "U.K."} // tmp variable
 	for id, name := range roomNames {
-		room := &Room{uint(id), name, make(map[uint]*Client), 0, make([]*Message, 50)}
+		room := &Room{
+			id		: uint(id),
+			name		: name,
+			members		: make(map[uint]*Client),
+			historySize	: 0,
+			history		: make([]*Message, 50),
+		}
 		rooms[uint(id)] = room
 	}
 	
@@ -168,12 +174,12 @@ func db() {
 			messages := make([](map[string]interface{}), room.historySize)
 			for i := uint(0); i < room.historySize; i++ {
 				messages[i] = map[string]interface{} {
-					"from_type": TYPE_MAP[history[i].from_type],
-					"from_id": history[i].from_id,
-					"to_type": TYPE_MAP[history[i].to_type],
-					"to_id": history[i].to_id,
-					"body": history[i].body,
-					"created_at": history[i].created_at.Format(TIME_LAYOUT),
+					"from_type"	: TYPE_MAP[history[i].from_type],
+					"from_id"	: history[i].from_id,
+					"to_type"	: TYPE_MAP[history[i].to_type],
+					"to_id"		: history[i].to_id,
+					"body"		: history[i].body,
+					"created_at"	: history[i].created_at.Format(TIME_LAYOUT),
 				}
 			}
 			data = messages
@@ -220,12 +226,12 @@ func db() {
 			body := params["body"].(string)
 			created_at := params["created_at"].(time.Time)
 			message := &Message{
-				from_type : client.utype,
-				from_id : client.id,
-				to_type : T_ROOM,
-				to_id : rid,
-				body : body,
-				created_at : created_at,
+				from_type	: client.utype,
+				from_id		: client.id,
+				to_type		: T_ROOM,
+				to_id		: rid,
+				body		: body,
+				created_at	: created_at,
 			}
 			room := rooms[rid]
 			room.history[room.historySize] = message
@@ -235,13 +241,13 @@ func db() {
 				members := room.members
 				for _, member := range members {
 					msg := map[string]interface{} {
-						"path": "message",
-						"from_type": TYPE_MAP[client.utype],
-						"from_id": client.id,
-						"to_type" : TYPE_MAP[T_ROOM],
-						"to_id" : rid,
-						"body": body,
-						"created_at": created_at.Format(TIME_LAYOUT),
+						"path"		: "message",
+						"from_type"	: TYPE_MAP[client.utype],
+						"from_id"	: client.id,
+						"to_type"	: TYPE_MAP[T_ROOM],
+						"to_id"		: rid,
+						"body"		: body,
+						"created_at"	: created_at.Format(TIME_LAYOUT),
 					}
 					member.mailbox <- msg
 				}
@@ -355,9 +361,7 @@ func message(req, resp *map[string]interface{}) {
 	(*resp)["status"] = "ok"
 }
 
-func typing(req, resp *map[string]interface{}) {
-	// ::TODO
-}
+func typing(req, resp *map[string]interface{}) { /* ::TODO */ }
 
 
 // Handler for each client connection
@@ -366,8 +370,8 @@ func ChatHandler(ws *websocket.Conn) {
 	
 	var client *Client
 	
-	mailbox := make(chan map[string]interface{}, 2)
 	// Receive mssage from internal process (`func db()` actually)
+	mailbox := make(chan map[string]interface{}, 2)
 	go func() {
 		for msg := range mailbox {
 			fmt.Printf("[Mailbox]: %v\n", msg)
@@ -378,7 +382,7 @@ func ChatHandler(ws *websocket.Conn) {
 			case "presence":
 				// pass
 			default:
-				// Something wrong here.
+				// Something wrong here!!!
 			}
 			b, _ := json.Marshal(msg)
 			ws.Write(b)
@@ -388,6 +392,7 @@ func ChatHandler(ws *websocket.Conn) {
 	buf := make([]byte, 32<<10)
 	for true {
 		if n, _ := ws.Read(buf); n > 0 {
+			// Decode request
 			println("[Received]:", n, ":", string(buf[:n]))
 			var req map[string]interface{}
 			json.Unmarshal(buf[:n], &req)
@@ -396,7 +401,7 @@ func ChatHandler(ws *websocket.Conn) {
 			req["client"] = client
 			path := req["path"].(string)
 			
-			// Router
+			// Request Router
 			switch path {
 			case "create_client":
 				createClient(&req, &resp)
@@ -423,23 +428,19 @@ func ChatHandler(ws *websocket.Conn) {
 			case "typing":
 				typing(&req, &resp)
 			}
-			
+
+			// Encode response
 			resp["path"] = path
 			b, _ := json.Marshal(resp)
-			println("[Response]:", string(b))
 			ws.Write(b)
+			println("[Response]:", string(b))
+			
 		} else { break }
 	}
 }
 
 
 func main() {
-	// Serve for static files
-	go func() {
-		println("[Starting] static files server......")
-		public_root := filepath.Join(filepath.Dir(os.Args[0]), "public")
-		http.ListenAndServe(":9090", http.FileServer(http.Dir(public_root)))
-	}()
 
 	// Init vars
 	TYPE_MAP = map[int]string {
@@ -449,6 +450,13 @@ func main() {
 	}
 	dbPool = make(chan *Query, DB_POOL_SIZE)
 	go db()
+	
+	// Serve for static files
+	go func() {
+		println("[Starting] static files server......")
+		public_root := filepath.Join(filepath.Dir(os.Args[0]), "public")
+		http.ListenAndServe(":9090", http.FileServer(http.Dir(public_root)))
+	}()
 	
 	http.Handle("/", websocket.Handler(ChatHandler))
 	http.ListenAndServe(":9091", nil)
