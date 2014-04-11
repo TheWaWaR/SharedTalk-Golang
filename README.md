@@ -10,8 +10,8 @@ SharedTalk-Golang
 ## 如何使用?
 
 ```bash
-        git clone https://github.com/TheWaWaR/SharedTalk-Golang.git
-        cd SharedTalk-Golang
-        make
-        make run
+git clone https://github.com/TheWaWaR/SharedTalk-Golang.git
+cd SharedTalk-Golang
+make
+make run
 ```
