@@ -11,6 +11,7 @@ SharedTalk-Golang
 
 ```bash
 git clone https://github.com/TheWaWaR/SharedTalk-Golang.git
+go get code.google.com/p/go.net/websocket
 cd SharedTalk-Golang
 make
 make run
