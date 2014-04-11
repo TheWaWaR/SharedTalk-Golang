@@ -6,21 +6,24 @@ import (
 	"fmt"
 	"time"
 	"net/http"
-	"encoding/json"
 	"path/filepath"
+	"encoding/json"
 	"code.google.com/p/go.net/websocket"
 )
 
+// Global variables
 var (
 	clientCnt uint
 	newClient chan *Client
-	dbConn chan *Query
+	dbConns chan *Query
 	clients map[uint]*Client
 	clientTokens map[string]*Client
 	rooms map[uint]*Room
 )
 
-// Models
+// ============================================================================
+//  Models
+// ============================================================================
 type Client struct {
 	id uint
 	name string
@@ -42,14 +45,16 @@ type Message struct {
 }
 
 // Query types
-const (				
-	Q_ONLINE = iota
+const (
+	Q_NEW_CLIENT = iota
+	Q_ONLINE
 	Q_OFFLINE
 	Q_ROOMS 
 	Q_MEMBERS
 	Q_HISTORY
 	Q_JOIN
 	Q_LEAVE
+	Q_MESSAGE
 )
 type Query struct {
 	action uint
@@ -58,151 +63,186 @@ type Query struct {
 }
 
 
-// Data access
+// ============================================================================
+//  Data access
+// ============================================================================
 func db() {
-	for true {
-		select {
-		case client := <-newClient:
-			id := client.id
-			token := client.token
-			clients[id] = client
-			clientTokens[token] = client
-			
-		case query := <-dbConn:
-			var data interface{}
-			println("Inside query:", query)
-			switch int((*query).action) {
-			case Q_ONLINE:
-				println("Q_LINE", 1)
-				token := query.params.(string)
-				println("Q_LINE", 2)
-				data = clientTokens[token]
-				println("Q_LINE", 3, data.(*Client))
-			case Q_OFFLINE:
-				// pass
-			case Q_ROOMS:
-				// pass
-			case Q_MEMBERS:
-				// pass
-			case Q_HISTORY:
-				// pass
-			case Q_JOIN:
-				// pass
-			case Q_LEAVE:
-				// pass
-			default:
-				println("Unexcepted query:", query.action)
+	for query := range dbConns{
+		var data interface{}
+		println("Inside query:", query, query.action, query.params, query.receiver)
+		
+		switch int((*query).action) {
+		case Q_NEW_CLIENT:
+			clientCnt++
+			client := new(Client)
+			client.id = clientCnt
+			client.name = fmt.Sprintf("name-%d", clientCnt)
+			client.token = fmt.Sprintf("token-%d", clientCnt)
+			clients[client.id] = client
+			clientTokens[client.token] = client
+			data = client
+		case Q_ONLINE:
+			token := query.params.(string)
+			data = clientTokens[token]
+		case Q_OFFLINE:
+			// ::Later
+		case Q_ROOMS:
+			idx := 0
+			sl := make([](map[string]interface{}), len(rooms))
+			for _, room := range rooms {
+				sl[idx] = map[string]interface{}{
+					"oid": room.id,
+					"name": room.name,
+				}
+				idx ++
 			}
+			data = sl
+			// pass
+		case Q_MEMBERS:
+			rid := uint(query.params.(float64))
+			members := rooms[rid].members
+			idx := 0
+			sl := make([](map[string]interface{}), len(members))
+			for cid, client := range members {
+				sl[idx] = map[string]interface{} {
+					"oid": cid,
+					"name": client.name,
+				}
+			}
+			// pass
+		case Q_HISTORY:
+			// rid := query.params.(uint)
+			// pass
+		case Q_JOIN:
+			params := query.params.(map[string]interface{})
+			rid := uint(params["oid"].(float64))
+			client := params["client"].(*Client)
+			members := rooms[rid].members
+			members[rid] = client
+			// pass
+		case Q_LEAVE:
+			// pass
+		default:
+			println("Unexcepted query:", query.action)
+		}
+		
+		if query.receiver != nil {
 			query.receiver <-data
 		}
+		println("End query!", query.action)
 	}
+	
+	println("Database closed !!!!!!")
 }
 
 
-// Actions
+
+// ============================================================================
+//  Actions
+// ============================================================================
+
+// help function for [createClient, online]
+func _newClient() (*Client) {
+	receiver := make(chan interface{})
+	dbConns <- &Query{Q_NEW_CLIENT, nil, receiver}
+	println("waiting for receiver, _newClient")
+	data := <-receiver
+	client := data.(*Client)
+	return client
+}
+
 func createClient(req, resp *map[string]interface{}) {
-	clientCnt += 1
-	token := fmt.Sprintf("token-%d", clientCnt)
-	client := &Client{clientCnt, fmt.Sprintf("name-%d", clientCnt), token}
-	newClient <- client
-	(*resp)["token"] = token
+	client := _newClient()
+	(*resp)["token"] = client.token
 }
 
 func online(req, resp *map[string]interface{}) (*Client) {
-	token := (*req)["token"].(string)
-	params := token
+	token := (*req)["token"]
 	receiver := make(chan interface{})
-	dbConn <- &Query{Q_ONLINE, params, receiver}
+	dbConns <- &Query{Q_ONLINE, token, receiver}
 	data := <-receiver
 	println("online.data:", data)
+
 	client := data.(*Client)
-	println("online.client:", client)
-	
+	if client == nil {
+		println("data is nil.")
+		client = _newClient()
+	} else {
+		println("data is not nil.")
+	}
+	println("the client:", client)
+
 	(*resp)["oid"] = (*client).id
 	(*resp)["name"] = (*client).name
 	return client
 }
 
 func offline(req, resp *map[string]interface{}) {
-	client := (*req)["client"].(*Client)
+	client := (*req)["client"]
 	params := map[string]interface{} {
 		"client": client,
 	}
-	dbConn <- &Query{Q_OFFLINE, params, make(chan interface{})}
+	dbConns <- &Query{Q_OFFLINE, params, nil}
 }
 
 func getRooms(req, resp *map[string]interface{}) {
 	receiver := make(chan interface{})
-	query := &Query{Q_ROOMS, nil, receiver}
-	dbConn <-query
+	dbConns <- &Query{Q_ROOMS, nil, receiver}
 	rooms := <-receiver
+	fmt.Printf("rooms: %v", rooms)
 	(*resp)["rooms"] = rooms
 }
 
 func members(req, resp *map[string]interface{}) {
-	rid := (*req)["oid"].(int)
-	params := map[string]interface{} {
-		"id": rid,
-	}
+	rid := (*req)["oid"]
 	receiver := make(chan interface{})
-	query := &Query{Q_MEMBERS, params, receiver}
-	dbConn <-query
+	dbConns <- &Query{Q_MEMBERS, rid, receiver}
 	members := <-receiver
 	(*resp)["oid"] = rid
 	(*resp)["members"] = members
 }
 
 func history(req, resp *map[string]interface{}) {
-	rid := (*req)["oid"].(int)
-	params := map[string]interface{} {
-		"id": rid,
-	}
+	rid := (*req)["oid"]
 	receiver := make(chan interface{})
-	query := &Query{Q_HISTORY, params, receiver}
-	dbConn <-query
+	dbConns <- &Query{Q_HISTORY, rid, receiver}
 	messages := <-receiver
 	(*resp)["oid"] = rid
 	(*resp)["messages"] = messages
 }
 
 func join(req, resp *map[string]interface{}) {
-	rid := (*req)["oid"].(int)
-	client := (*req)["client"].(*Client)
+	rid := (*req)["oid"]
+	client := (*req)["client"]
 	params := map[string]interface{} {
-		"id": rid,
+		"oid": rid,
 		"client": client,
 	}
-	receiver := make(chan interface{})
-	query := &Query{Q_JOIN, params, receiver}
-	dbConn <-query
+	dbConns <- &Query{Q_JOIN, params, nil}
 	(*resp)["oid"] = rid
 }
 
 func leave(req, resp *map[string]interface{}) {
-	rid := (*req)["oid"].(int)
-	client := (*req)["client"].(*Client)
+	rid := (*req)["oid"]
+	client := (*req)["client"]
 	params := map[string]interface{} {
 		"client": client,
-		"id": rid,
+		"oid": rid,
 	}
-	receiver := make(chan interface{})
-	query := &Query{Q_LEAVE, params, receiver}
-	dbConn <-query
+	dbConns <- &Query{Q_LEAVE, params, nil}
 	(*resp)["oid"] = rid
 }
 
 func message(req, resp *map[string]interface{}) {
-	rid := (*req)["oid"].(int)
-	client := (*req)["client"].(*Client)
+	rid := (*req)["oid"]
+	client := (*req)["client"]
 	params := map[string]interface{} {
 		"client" : client,
-		"id" : rid,	// room.id (send message to)
+		"oid" : rid,	// room.id (send message to)
 		"body" : (*req)["body"],
 		"created_at": time.Now(),
 	}
-	receiver := make(chan interface{})
-	query := &Query{Q_LEAVE, params, receiver}
-	dbConn <-query
+	dbConns <- &Query{Q_MESSAGE, params, nil}
 	(*resp)["oid"] = rid
 	(*resp)["status"] = "ok"
 }
@@ -255,6 +295,7 @@ func ChatHandler(ws *websocket.Conn) {
 			resp["path"] = path
 			println("response:", resp)
 			b, _ := json.Marshal(resp)
+			println("[JSON]resp:", string(b))
 			ws.Write(b)
 		} else { break }
 	}
@@ -271,7 +312,7 @@ func main() {
 	// Init vars
 	CHAN_SIZE := 8
 	newClient = make(chan *Client, CHAN_SIZE)
-	dbConn = make(chan *Query, CHAN_SIZE)
+	dbConns = make(chan *Query, CHAN_SIZE)
 	clients = make(map[uint]*Client)
 	clientTokens = make(map[string]*Client)
 	
