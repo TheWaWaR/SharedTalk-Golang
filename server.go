@@ -17,32 +17,32 @@ const (
 	TIME_LAYOUT = "2006-01-02 15:04:05" // time formatter (weird thing....)
 )
 var (
-	clientCnt uint
-	TYPE_MAP map[int]string
-	dbPool chan *Query	// Channel for data access
+	clientCnt	 uint
+	TYPE_MAP	 map[int]string
+	dbPool		 chan *Query	// Channel for data access
 )
 
 // ============================================================================
 //  Models
 // ============================================================================
 type Client struct {
-	id uint
-	utype int
-	name string
-	token string
-	mailbox chan map[string]interface{}
-	rooms map[uint]*Room
+	id	 uint
+	utype	 int
+	name	 string
+	token	 string
+	mailbox	 chan map[string]interface{}
+	rooms	 map[uint]*Room
 }
 
 type User struct {}		// ::TODO
 type Visitor struct {}		// ::TODO
 
 type Room struct {
-	id uint
-	name string
-	members map[uint]*Client
-	historySize uint
-	history []*Message
+	id		 uint
+	name		 string
+	members		 map[uint]*Client
+	historySize	 uint
+	history		 []*Message
 }
 
 // Sender/Receiver types (for future)
@@ -71,9 +71,9 @@ const (
 	Q_MESSAGE
 )
 type Query struct {
-	action int
-	params interface{}
-	receiver chan interface{}
+	action		 int
+	params		 interface{}
+	receiver	 chan interface{}
 }
 
 // ============================================================================
