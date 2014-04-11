@@ -211,10 +211,10 @@ func db() {
 			delete(rooms[rid].members, client.id)
 			
 			msg := map[string]interface{} {
-				"path": "presence",
-				"action": "leave",
-				"member": map[string]interface{} {
-					"oid": client.id,
+				"path" : "presence",
+				"action" : "leave",
+				"member" : map[string]interface{} {
+					"oid" : client.id,
 				},
 			}
 			client.mailbox <- msg
@@ -351,11 +351,11 @@ func message(req, resp *map[string]interface{}) {
 	to_type := (*req)["type"]
 	to_id := (*req)["oid"]
 	params := map[string]interface{} {
-		"client" : (*req)["client"],
-		"to_type" : &to_type,
-		"to_id" : to_id, // room.id (send message to)
-		"body" : (*req)["body"],
-		"created_at": time.Now(),
+		"client"	: (*req)["client"],
+		"to_type"	: &to_type,
+		"to_id"		: to_id, // room.id (send message to)
+		"body"		: (*req)["body"],
+		"created_at"	: time.Now(),
 	}
 	dbPool <- &Query{Q_MESSAGE, params, nil}
 	(*resp)["status"] = "ok"
@@ -382,7 +382,7 @@ func ChatHandler(ws *websocket.Conn) {
 			case "presence":
 				// pass
 			default:
-				// Something wrong here!!!
+				println("[Mailbox] Something wrong here!!! ==>", path)
 			}
 			b, _ := json.Marshal(msg)
 			ws.Write(b)
