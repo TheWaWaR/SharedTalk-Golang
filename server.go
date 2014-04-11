@@ -298,8 +298,8 @@ func online(req, resp *map[string]interface{}) (*Client) {
 	return client
 }
 
-func offline(req, resp *map[string]interface{}) {
-	dbPool <- &Query{Q_OFFLINE, (*req)["client"], nil}
+func offline(client *Client) {
+	dbPool <- &Query{Q_OFFLINE, client, nil}
 }
 
 func getRooms(req, resp *map[string]interface{}) {
@@ -411,7 +411,7 @@ func ChatHandler(ws *websocket.Conn) {
 					client.mailbox = mailbox
 				}
 			case "offline":
-				offline(&req, &resp)
+				offline(client)
 				break // Close connection
 			case "rooms":
 				getRooms(&req, &resp) // already has `rooms`
@@ -435,7 +435,10 @@ func ChatHandler(ws *websocket.Conn) {
 			ws.Write(b)
 			println("[Response]:", string(b))
 			
-		} else { break }
+		} else {
+			offline(client)
+			break
+		}
 	}
 }
 
