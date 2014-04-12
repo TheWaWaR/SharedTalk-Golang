@@ -2,7 +2,7 @@ SharedTalk-Golang
 =================
 
 ## 简介
-  Demo:: [http://ahorn.me:9090/html/](http://ahorn.me:9090/html/)
+  Demo:: [http://ahorn.me:9090/](http://ahorn.me:9090/)
 
   一个简单的聊天室，试图模仿 [SharedTalk](http://sharedtalk.com)
 
