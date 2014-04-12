@@ -103,7 +103,7 @@ func db() {
 			id		: uint(id),
 			name		: name,
 			members		: make(map[uint]*Client),
-			history		: make([]*Message, 100),
+			history		: make([]*Message, 0, 20),
 		}
 		rooms[uint(id)] = room
 	}
@@ -186,6 +186,7 @@ func db() {
 			rid := uint(query.params.(float64))
 			room := rooms[rid]
 			history := room.history
+			println("[Q_HISTORY]: len(history)", len(history))
 			messages := make([](map[string]interface{}), len(history))
 			for i := uint(0); i < uint(len(history)); i++ {
 				messages[i] = map[string]interface{} {
