@@ -213,6 +213,7 @@
               $scope.currentRid = room.oid;
               break;
             }
+            initTabs();
             break;
           case 'join':
             msg = {

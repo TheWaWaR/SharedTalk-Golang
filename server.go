@@ -48,7 +48,6 @@ type Room struct {
 	id		 uint
 	name		 string
 	members		 map[uint]*Client
-	historySize	 uint
 	history		 []*Message
 }
 
@@ -104,8 +103,7 @@ func db() {
 			id		: uint(id),
 			name		: name,
 			members		: make(map[uint]*Client),
-			historySize	: 0,
-			history		: make([]*Message, 50),
+			history		: make([]*Message, 100),
 		}
 		rooms[uint(id)] = room
 	}
@@ -188,8 +186,8 @@ func db() {
 			rid := uint(query.params.(float64))
 			room := rooms[rid]
 			history := room.history
-			messages := make([](map[string]interface{}), room.historySize)
-			for i := uint(0); i < room.historySize; i++ {
+			messages := make([](map[string]interface{}), len(history))
+			for i := uint(0); i < len(history); i++ {
 				messages[i] = map[string]interface{} {
 					"from_type"	: TYPE_MAP[history[i].from_type],
 					"from_id"	: history[i].from_id,
@@ -264,8 +262,7 @@ func db() {
 				created_at	: created_at,
 			}
 			room := rooms[rid]
-			room.history[room.historySize] = message
-			room.historySize++
+			append(room.history, message)
 
 			go func () {
 				members := room.members

@@ -156,7 +156,8 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
                 for room in data.rooms
                     $scope.currentRid = room.oid
                     break
-                    
+                do initTabs
+            
             when 'join'
                 msg = {path: 'members', oid: data.oid}
                 ws.send (JSON.stringify msg)
