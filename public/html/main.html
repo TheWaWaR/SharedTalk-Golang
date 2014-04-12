@@ -49,8 +49,10 @@
                     </div>
                   </div>
                   <hr />
-                  <input id="message-input-{{room.oid}}" class="form-control input-sm"                              
-                         type="text" ng-model="text" placeholder="Enter Message">
+                  <form ng-submit="send('room', room.oid)">
+                    <input id="message-input-{{room.oid}}" class="form-control input-sm" 
+                           type="text" ng-model="text" placeholder="Enter Message">
+                  </form>
                 </div>
                 <div class="col-sm-3">
                   <ul class="list-group members">
