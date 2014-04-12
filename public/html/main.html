@@ -2,22 +2,44 @@
 <div class="container">
   <h3><img ng-src="http://www.gravatar.com/avatar/{{user.oid}}?s=20&d=identicon&f=y" /> {{ user.name }}</h3>
   <hr />
+  
+  <div class="col-sm-2">
+    <ul class="nav nav-pills nav-stacked"
+        style="border-left: 1px solid #DDDDDD; padding-left:5px;">
+      <li ng-repeat="(rid, room) in rooms" ng-if="!room.joined">
+        <a href=""
+           ng-click="toggleRoom(room.oid)">{{room.name}}</a>
+      </li>
+    </ul>
+  </div>
 
-  <div class="col-sm-9">
+  <div class="col-sm-10">
     <div class="row">
+      <div ng-if="joinedSize>0" >
+        <ul id="room-tabs" class="nav nav-tabs" style="margin-bottom: 20px;">
+          <li ng-repeat="(rid, _b) in joinedRooms"
+              ng-init="room=rooms[rid];hideBtn=true;"
+              ng-mouseover="hideBtn=false"
+              ng-mouseleave="hideBtn=true">
+            <a id="rtab-{{room.oid}}" href="#room-{{room.oid}}" data-toggle="tab"
+               ng-click="showTab(room.oid)">
+              <span class="notifier hide"><b>*</b></span>{{room.name}} [{{objSize(members[room.oid])}}]
+            </a>
+            <!-- Close tab button -->
+            <button class="btn btn-xs btn-danger"
+                    style="position:absolute; right:2px; top:0; width:22px; height:22px; opacity:0.8;"
+                    ng-class="{hide:hideBtn}"
+                    ng-click="toggleRoom(room.oid)" href="">
+              <i class="fa fa-times"></i>
+            </button>
+          </li>
+        </ul>
 
-      <ul id="room-tabs" class="nav nav-tabs" style="margin-bottom: 20px;">
-        <li ng-repeat="room in rooms">
-          <a id="rtab-{{room.oid}}" href="#room-{{room.oid}}" data-toggle="tab" ng-click="showTab(room.oid)">
-            {{room.name}} ({{ history[room.oid].length}}<span class="notifier hide">*</span>)
-          </a>
-        </li>
-      </ul>
-
-      <div class="tab-content">
-        <div ng-repeat="room in rooms"  id="room-{{room.oid}}" class="tab-pane">
-          <div class="">
-            <div class="container">
+        <div class="tab-content">
+          <div id="room-{{room.oid}}" class="tab-pane"
+               ng-repeat="(rid, _b) in joinedRooms"
+               ng-init="room=rooms[rid]">
+            <div class="">
               <div class="row">
                 <div class="col-sm-9">
                   <div id="room-{{room.oid}}" class="well">
@@ -27,7 +49,8 @@
                     </div>
                   </div>
                   <hr />
-                  <form class="form-inline" role="form" ng-submit="send('room', room.oid)">
+                  <form class="form-inline" role="form"
+                        ng-submit="send('room', room.oid)">
                     <div class="form-group">
                       <input type="text" ng-model="text"
                              class="form-control input-sm" id="message-input-{{room.oid}}" placeholder="Enter Message">
@@ -38,24 +61,24 @@
                   </form>
                 </div>
                 <div class="col-sm-3">
-                  <div class="list-group members">
+                  <ul class="list-group members">
                     <li ng-repeat="member in members[room.oid]" class="list-group-item">
                       <img ng-src="http://www.gravatar.com/avatar/{{member.oid}}?s=12&d=identicon&f=y" /> {{member.name}}
                     </li>
-                  </div>
+                  </ul>
                 </div>
               </div>
-            </div>
-          </div> <!-- .panel -->
-        </div>   <!-- .tab-pane -->
-      </div> <!-- .tab-content -->
-    </div>
+            </div> <!-- .panel -->
+          </div>   <!-- .tab-pane -->
+        </div> <!-- .tab-content -->
+      </div> <!-- .room-tabs -->
+      
+      <div ng-if="joinedSize==0">
+        <div class="well"> Welcome! </div>
+      </div>
+
+    </div> <!-- .row -->
     
-  </div>
-  <div class="col-sm-3">
-    <div class="list-group">
-      <li ng-repeat="room in rooms" class="list-group-item">{{room.name}}</li>
-    </div>
-  </div>
+  </div> <!-- .col-sm-10 -->
 </div>
 </div> <!-- .container -->

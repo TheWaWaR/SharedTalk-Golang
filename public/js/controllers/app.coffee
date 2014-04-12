@@ -9,10 +9,31 @@ initTabs = () ->
 
     
 showTab = (selector) ->
-    $(selector).addClass "hide"
+    $tab = $(selector)
+    $tab.tab "show"
+    ($tab.find ".notifier").addClass "hide" # hide notifier
+    console.log "showTab:", selector
+
+
+Object.size = (obj) ->
+    size = 0
+    for k, v of obj
+        if obj.hasOwnProperty k
+            size++
+    return size
+
+
+loadJoined = () ->
+    ridsStr = $.cookie("room-ids")
+    joinedRooms = {}
+    if ridsStr?
+        for rid in ridsStr.split(",")
+            joinedRooms[rid] = true
+    return joinedRooms
     
-hideTab = (selector) ->
-    $(selector).removeClass "hide"
+saveJoined = (joinedRooms) ->
+    rids = (rid for rid, v of joinedRooms)
+    $.cookie("room-ids", rids)
 
 
 # Angular things
@@ -43,14 +64,17 @@ chatApp.factory "ChatService", ()->
 
 chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
     $scope.templateUrl = "/html/main.html"
-    $scope.user = {}
-    $scope.rooms = []
-    $scope.members = {}
-    $scope.history = {}
-    $scope.users = {}
-    $scope.visitors = {}
+    $scope.user = {}            # key : value
+    $scope.rooms = {}
+    $scope.joinedRooms = {}     # room.id : true|false
+    $scope.joinedSize = 0
+    $scope.members = {}         # {room.id : {user.id: user}}
+    $scope.history = {}         # room.id : [message, ...]
+    $scope.users = {}           # user.id : [user, ...]
+    $scope.visitors = {}        # visitor.id : [visitor, ...]
     $scope.currentRid = null
 
+    # Function for pages
     $scope.send = (type, oid) ->
         # body = $('#message-input-'+id).val()
         body = this.text
@@ -62,10 +86,24 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
             this.text = ""
 
     $scope.showTab = (rid) ->
+        console.log "$scope.showTab:", rid
         $scope.currentRid = rid
-        showTab "#rtab-#{$scope.currentRid} .notifier"
-        return
+        showTab "#rtab-#{$scope.currentRid}"
+        return null             # Because augular function cann't return DOM object!!!
 
+    $scope.toggleRoom = (rid) ->
+        console.log "toggleRoom", rid, $scope.joinedRooms, (rid of $scope.joinedRooms)
+        if rid of $scope.joinedRooms
+            msg = {'path': 'leave', 'oid': rid}
+        else
+            msg = {'path': 'join', 'oid': rid}
+        ws.send (JSON.stringify msg)
+
+    $scope.objSize = (obj) ->
+        return Object.size obj
+        
+
+    # Service things
     ChatService.setOnopen () ->
         token = $.cookie('token')
         msg = {}
@@ -78,7 +116,8 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
             msg.type = 'user'
         ws.send (JSON.stringify msg)
         console.log 'Opened'
-        
+
+                
     ChatService.setOnmessage (event) ->
         data = JSON.parse event.data
         console.log '<<DATA>>:', data
@@ -91,6 +130,7 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
             when 'online'
                 if data.reset?
                     $.removeCookie 'token'
+                    $.removeCookie 'room-ids'
                     msg = {path:'create_client', type:'user'}
                     ws.send (JSON.stringify msg)
                     console.log 'Reset'
@@ -100,12 +140,19 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
                     msg = {path:'rooms'}
                     ws.send (JSON.stringify msg)
                     console.log 'Onlined'
+                    
             when 'rooms'
-                $scope.rooms = data.rooms
+                $scope.joinedRooms = do loadJoined
                 for room in data.rooms
-                    msg = {path: 'join', oid: room.oid}
-                    ws.send (JSON.stringify msg)
+                    $scope.rooms[room.oid] = room
+                    if room.oid of $scope.joinedRooms
+                        room.joined = true
+                        msg = {'path': 'join', 'oid': room.oid}
+                        ws.send (JSON.stringify msg)
+                    else
+                        room.joined = false
                 console.log 'rooms:', $scope.rooms
+                # just fill the currentRid
                 for room in data.rooms
                     $scope.currentRid = room.oid
                     break
@@ -113,18 +160,39 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
             when 'join'
                 msg = {path: 'members', oid: data.oid}
                 ws.send (JSON.stringify msg)
-                msg = {path: 'history', type:'room', oid: data.oid}
-                ws.send (JSON.stringify msg)
                 console.log 'Joined:', data
+                $scope.rooms[data.oid].joined = true
+                $scope.joinedRooms[data.oid] = true
+                $scope.joinedSize += 1
+                saveJoined $scope.joinedRooms
+                
+            when 'leave'
+                delete $scope.members[data.oid]
+                delete $scope.history[data.oid]
+                delete $scope.joinedRooms[data.oid]
+                $scope.rooms[data.oid].joined = false
+                $scope.joinedSize -= 1
+                
+                # Find next currentRid
+                if data.oid == $scope.currentRid
+                    for rid, v of $scope.joinedRooms
+                        $scope.showTab rid
+                        break
+                saveJoined $scope.joinedRooms
+                
             when 'members'
                 $scope.members[data.oid] = {}
                 for member in data.members
                     $scope.members[data.oid][member.oid] = member
                 console.log 'Get members:', $scope.members, data.members
+                msg = {path: 'history', type:'room', oid: data.oid}
+                ws.send (JSON.stringify msg)
+                
             when 'history'
                 $scope.history[data.oid] = data.messages
                 console.log 'Get history:', data.oid, data.messages
-                do initTabs
+                $scope.showTab data.oid
+                
             when 'presence'
                 switch data.to_type
                     when 'room'
@@ -141,7 +209,8 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
                     when 'room'
                         console.log 'received message:', data
                         if data.to_id != $scope.currentRid
-                            hideTab "#rtab-#{data.to_id} .notifier"
+                            $("#rtab-#{data.to_id} .notifier").removeClass "hide"
+                        console.log $("#rtab-#{data.to_id} .notifier"), $scope.currentRid, data.to_id
                         $scope.history[data.to_id].push data
                         # $('#room-'+data.oid).append "#{data.from}: #{data.body}<br />"
                 console.log 'Message.type:', data.to_type

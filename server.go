@@ -95,7 +95,10 @@ func db() {
 	clientTokens := make(map[string]*Client)
 	rooms := make(map[uint]*Room)
 	
-	roomNames := [...]string{"Japan", "China", "U.S.", "Russia", "U.K."} // tmp variable
+	roomNames := [...]string{
+		"Japan", "China", "U.S.", "Russia", "U.K.",
+		"Canada", "France", "German", "Korea", "AUS", "Mars~",
+	}			// tmp variable
 	for id, name := range roomNames {
 		room := &Room{
 			id		: uint(id),
@@ -203,11 +206,9 @@ func db() {
 			rid := uint(params["oid"].(float64))
 			client := params["client"].(*Client)
 			room := rooms[rid]
-			client.rooms[rid] = room
-			fmt.Printf("[Q_JOIN] rooms[rid].members: %v\n", rooms[rid].members)
 
-			members := room.members
-			for _, member := range members {
+			for _, member := range room.members {
+				println("[Join message] send to member:", member.id, member.mailbox)
 				msg := map[string]interface{} {
 					"path": "presence",
 					"action": "join",
@@ -220,24 +221,33 @@ func db() {
 				}
 				member.mailbox <- msg
 			}
-			members[client.id] = client
+			fmt.Printf("[Q_JOIN] rooms[rid].members: %v\n", rooms[rid].members)
+			fmt.Printf("[Q_JOIN] client: %v, client.id: %v\n", client, client.id)
+			client.rooms[rid] = room
+			room.members[client.id] = client
 
-			
 		case Q_LEAVE:
 			params := query.params.(map[string]interface{})
 			rid := uint(params["oid"].(float64))
 			client := params["client"].(*Client)
+			room := rooms[rid] 
 			delete(client.rooms, rid)
-			delete(rooms[rid].members, client.id)
-			
-			msg := map[string]interface{} {
-				"path" : "presence",
-				"action" : "leave",
-				"member" : map[string]interface{} {
-					"oid" : client.id,
-				},
+			delete(room.members, client.id)
+
+			fmt.Printf("[Q_LEAVE]: %v\n", room.members)
+			for _, member := range room.members {
+				println("[Leave message] send to member:", member.id, member.mailbox)
+				msg := map[string]interface{} {
+					"path": "presence",
+					"action": "leave",
+					"to_type": TYPE_MAP[T_ROOM],
+					"to_id": rid,
+					"member": map[string]interface{} {
+						"oid": client.id,
+					},
+				}
+				member.mailbox <- msg
 			}
-			client.mailbox <- msg
 			
 		case Q_MESSAGE:
 			params := query.params.(map[string]interface{})
