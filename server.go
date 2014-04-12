@@ -1,6 +1,13 @@
 
 package main
 
+// TODO:
+//   1. Time Zone issue
+//   2. Data persistent (Then we can use `mother goose')
+//   3. Command line arguments
+//   4. Register-User/Visitor support
+
+
 import (
 	"os"
 	"fmt"
@@ -13,18 +20,18 @@ import (
 
 // Constants & Global variables
 const (
-	DB_POOL_SIZE = 8 
+	QUERY_BUF_SIZE = 8 
 	TIME_LAYOUT = "2006-01-02 15:04:05" // time formatter (weird thing....)
 )
 var (
 	clientCnt	 uint
 	TYPE_MAP	 map[int]string
-	dbPool		 chan *Query	// Channel for data access
+	dbQuerys	 chan *Query // Channel for data access
 )
 
-// ============================================================================
-//  Models
-// ============================================================================
+/*=============================================================================
+ * Models
+ *===========================================================================*/
 type Client struct {
 	id	 uint
 	utype	 int
@@ -45,11 +52,11 @@ type Room struct {
 	history		 []*Message
 }
 
-// Sender/Receiver types (for future)
+// Sender/Receiver types (::TODO)
 const (
 	T_ROOM = iota
 	T_USER			// Register user
-	T_VISITOR
+	T_VISITOR		// Anonymous user from other website, like this: https://www.zopim.com/
 )
 type Message struct {
 	from_type, to_type int	// aka. Client.utype
@@ -76,9 +83,10 @@ type Query struct {
 	receiver	 chan interface{}
 }
 
-// ============================================================================
-//  Data access
-// ============================================================================
+/*============================================================================
+ * Data access:
+ *     Receive some arguments then send a map[string]interface{} back
+ *==========================================================================*/
 func db() {
 	println("[Starting] db() ......")
 
@@ -86,8 +94,8 @@ func db() {
 	clients := make(map[uint]*Client)
 	clientTokens := make(map[string]*Client)
 	rooms := make(map[uint]*Room)
-	roomNames := [...]string{"Japan", "China", "U.S.", "Russia", "U.K."} // tmp variable
 	
+	roomNames := [...]string{"Japan", "China", "U.S.", "Russia", "U.K."} // tmp variable
 	for id, name := range roomNames {
 		room := &Room{
 			id		: uint(id),
@@ -99,7 +107,7 @@ func db() {
 		rooms[uint(id)] = room
 	}
 	
-	for query := range dbPool {
+	for query := range dbQuerys {
 		var data interface{}
 		fmt.Printf("[Inside query]: %v\n", query)
 		
@@ -281,99 +289,103 @@ func db() {
 	println(">>> Database closed !!!!!! But why???")
 }
 
-/* ============================================================================
- *  Actions
- * ==========================================================================*/
-func createClient(req, resp *map[string]interface{}) {
+
+/*============================================================================
+ * Actions
+ *==========================================================================*/
+func createClient(req map[string]interface{}, resp *map[string]interface{}) {
 	receiver := make(chan interface{})
-	dbPool <- &Query{Q_NEW_CLIENT, nil, receiver}
+	dbQuerys <- &Query{Q_NEW_CLIENT, nil, receiver}
 	data := <-receiver
 	client := data.(*Client)
 	(*resp)["token"] = client.token
 }
 
-func online(req, resp *map[string]interface{}) (*Client) {
-	token := (*req)["token"]
+func online(req map[string]interface{}, resp *map[string]interface{}) {
+	token := req["token"]
 	receiver := make(chan interface{})
-	dbPool <- &Query{Q_ONLINE, token, receiver}
+	dbQuerys <- &Query{Q_ONLINE, token, receiver}
 	data := <-receiver
 
 	client := data.(*Client)
 	println("[Client]:", client)
 	if client == nil {
+		println("[online]: client is nil, reset!")
 		(*resp)["reset"] = true
-	}  else {
+	} else {
 		(*resp)["oid"] = (*client).id
 		(*resp)["name"] = (*client).name
+		(*resp)["client"] = client
 	}
-	
-	return client
 }
 
+// Special Action
 func offline(client *Client) {
-	dbPool <- &Query{Q_OFFLINE, client, nil}
+	dbQuerys <- &Query{Q_OFFLINE, client, nil}
 }
 
-func getRooms(req, resp *map[string]interface{}) {
+func getRooms(req map[string]interface{}, resp *map[string]interface{}) {
 	receiver := make(chan interface{})
-	dbPool <- &Query{Q_ROOMS, nil, receiver}
+	dbQuerys <- &Query{Q_ROOMS, nil, receiver}
 	rooms := <-receiver
 	(*resp)["rooms"] = rooms
 }
 
-func members(req, resp *map[string]interface{}) {
-	rid := (*req)["oid"]
+func members(req map[string]interface{}, resp *map[string]interface{}) {
+	rid := req["oid"]
 	receiver := make(chan interface{})
-	dbPool <- &Query{Q_MEMBERS, rid, receiver}
+	dbQuerys <- &Query{Q_MEMBERS, rid, receiver}
 	members := <-receiver
 	(*resp)["oid"] = rid
 	(*resp)["members"] = members
 }
 
-func history(req, resp *map[string]interface{}) {
-	rid := (*req)["oid"]
+func history(req map[string]interface{}, resp *map[string]interface{}) {
+	rid := req["oid"]
 	receiver := make(chan interface{})
-	dbPool <- &Query{Q_HISTORY, rid, receiver}
+	dbQuerys <- &Query{Q_HISTORY, rid, receiver}
 	messages := <-receiver
 	(*resp)["oid"] = rid
 	(*resp)["messages"] = messages
 }
 
-func join(req, resp *map[string]interface{}) {
-	rid := (*req)["oid"]
+func join(req map[string]interface{}, resp *map[string]interface{}) {
+	rid := req["oid"]
 	params := map[string]interface{} {
-		"client": (*req)["client"],
+		"client": req["client"],
 		"oid": rid,
 	}
-	dbPool <- &Query{Q_JOIN, params, nil}
+	dbQuerys <- &Query{Q_JOIN, params, nil}
 	(*resp)["oid"] = rid
 }
 
-func leave(req, resp *map[string]interface{}) {
-	rid := (*req)["oid"]
+func leave(req map[string]interface{}, resp *map[string]interface{}) {
+	rid := req["oid"]
 	params := map[string]interface{} {
-		"client": (*req)["client"],
+		"client": req["client"],
 		"oid": rid,
 	}
-	dbPool <- &Query{Q_LEAVE, params, nil}
+	dbQuerys <- &Query{Q_LEAVE, params, nil}
 	(*resp)["oid"] = rid
 }
 
-func message(req, resp *map[string]interface{}) {
-	to_type := (*req)["type"]
-	to_id := (*req)["oid"]
+func message(req map[string]interface{}, resp *map[string]interface{}) () {
+	to_type := req["type"]
+	to_id := req["oid"]
 	params := map[string]interface{} {
-		"client"	: (*req)["client"],
+		"client"	: req["client"],
 		"to_type"	: &to_type,
 		"to_id"		: to_id, // room.id (send message to)
-		"body"		: (*req)["body"],
+		"body"		: req["body"],
 		"created_at"	: time.Now(),
 	}
-	dbPool <- &Query{Q_MESSAGE, params, nil}
+	dbQuerys <- &Query{Q_MESSAGE, params, nil}
 	(*resp)["status"] = "ok"
 }
 
-func typing(req, resp *map[string]interface{}) { /* ::TODO */ }
+func typing(req map[string]interface{}, resp *map[string]interface{}) {
+	/* ::TODO */
+}
 
 
 // Handler for each client connection
@@ -404,41 +416,42 @@ func ChatHandler(ws *websocket.Conn) {
 	buf := make([]byte, 32<<10)
 	for true {
 		if n, _ := ws.Read(buf); n > 0 {
+			var req, resp map[string]interface{}
 			// Decode request
 			println("[Received]:", n, ":", string(buf[:n]))
-			var req map[string]interface{}
 			json.Unmarshal(buf[:n], &req)
 			
-			resp := make(map[string]interface{})
 			req["client"] = client
 			path := req["path"].(string)
 			
-			// Request Router
+			// Request Dispatcher
+			resp = make(map[string]interface{})
 			switch path {
 			case "create_client":
-				createClient(&req, &resp)
+				createClient(req, &resp)
 			case "online":
-				client = online(&req, &resp)
-				if client != nil {
+				online(req, &resp)
+				if resp["client"] != nil {
+					client = resp["client"].(*Client)
 					client.mailbox = mailbox
 				}
 			case "offline":
 				offline(client)
 				break // Close connection
 			case "rooms":
-				getRooms(&req, &resp) // already has `rooms`
+				getRooms(req, &resp) // already has `rooms`
 			case "members":
-				members(&req, &resp)
+				members(req, &resp)
 			case "history":
-				history(&req, &resp)
+				history(req, &resp)
 			case "join":
-				join(&req, &resp)
+				join(req, &resp)
 			case "leave":
-				leave(&req, &resp)
+				leave(req, &resp)
 			case "message":
-				message(&req, &resp)
+				message(req, &resp)
 			case "typing":
-				typing(&req, &resp)
+				typing(req, &resp)
 			}
 
 			// Encode response
@@ -463,7 +476,7 @@ func main() {
 		T_USER : "user",
 		T_VISITOR : "visitor",
 	}
-	dbPool = make(chan *Query, DB_POOL_SIZE)
+	dbQuerys = make(chan *Query, QUERY_BUF_SIZE)
 	go db()
 	
 	// Serve for static files
