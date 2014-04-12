@@ -187,7 +187,7 @@ func db() {
 			room := rooms[rid]
 			history := room.history
 			messages := make([](map[string]interface{}), len(history))
-			for i := uint(0); i < len(history); i++ {
+			for i := uint(0); i < uint(len(history)); i++ {
 				messages[i] = map[string]interface{} {
 					"from_type"	: TYPE_MAP[history[i].from_type],
 					"from_id"	: history[i].from_id,
@@ -262,7 +262,7 @@ func db() {
 				created_at	: created_at,
 			}
 			room := rooms[rid]
-			append(room.history, message)
+			room.history = append(room.history, message)
 
 			go func () {
 				members := room.members
