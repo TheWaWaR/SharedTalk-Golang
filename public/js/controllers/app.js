@@ -7,8 +7,7 @@
       e.preventDefault();
       return $(this).tab("show");
     });
-    $("#room-tabs a:first").tab("show");
-    return console.log("show first");
+    return $("#room-tabs a:first").tab("show");
   };
 
   showTab = function(selector) {

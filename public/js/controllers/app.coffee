@@ -5,7 +5,6 @@ initTabs = () ->
         $(this).tab "show"
 
     $("#room-tabs a:first").tab "show";
-    console.log "show first"
 
     
 showTab = (selector) ->

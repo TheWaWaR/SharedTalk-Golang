@@ -49,16 +49,8 @@
                     </div>
                   </div>
                   <hr />
-                  <form class="form-inline" role="form"
-                        ng-submit="send('room', room.oid)">
-                    <div class="form-group">
-                      <input type="text" ng-model="text"
-                             class="form-control input-sm" id="message-input-{{room.oid}}" placeholder="Enter Message">
-                    </div>
-                    <div class="form-group">
-                      <button type="submit" class="btn btn-sm btn-primary" >Send</button>
-                    </div>
-                  </form>
+                  <input id="message-input-{{room.oid}}" class="form-control input-sm"                              
+                         type="text" ng-model="text" placeholder="Enter Message">
                 </div>
                 <div class="col-sm-3">
                   <ul class="list-group members">

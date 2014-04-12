@@ -486,14 +486,14 @@ func main() {
 	}
 	dbQuerys = make(chan *Query, QUERY_BUF_SIZE)
 	go db()
+
+	go func() {
+		http.Handle("/", websocket.Handler(ChatHandler))
+		http.ListenAndServe(":9091", nil)
+	} ()
 	
 	// Serve for static files
-	go func() {
-		println("[Starting] static files server......")
-		public_root := filepath.Join(filepath.Dir(os.Args[0]), "public")
-		http.ListenAndServe(":9090", http.FileServer(http.Dir(public_root)))
-	}()
-	
-	http.Handle("/", websocket.Handler(ChatHandler))
-	http.ListenAndServe(":9091", nil)
+	println("[Starting] static files server......")
+	public_root := filepath.Join(filepath.Dir(os.Args[0]), "public")
+	http.ListenAndServe(":9090", http.FileServer(http.Dir(public_root)))
 }
