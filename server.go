@@ -25,7 +25,7 @@ const (
 )
 var (
 	clientCnt	 uint
-	TYPE_MAP	 map[int]string
+	TYPE_MAP	 map[uint64]string
 	dbQuerys	 chan *Query // Channel for data access
 )
 
@@ -33,33 +33,34 @@ var (
  * Models
  *===========================================================================*/
 type Client struct {
-	id	 uint
-	utype	 int
+	id	 uint64
+	utype	 uint64
 	name	 string
 	token	 string
 	mailbox	 chan map[string]interface{}
-	rooms	 map[uint]*Room
+	rooms	 map[uint64]*Room
 }
 
 type User struct {}		// ::TODO
 type Visitor struct {}		// ::TODO
 
 type Room struct {
-	id		 uint
+	id		 uint64
 	name		 string
-	members		 map[uint]*Client
+	members		 map[uint64]*Client
 	history		 []*Message
 }
 
 // Sender/Receiver types (::TODO)
 const (
-	T_ROOM = iota
-	T_USER			// Register user
-	T_VISITOR		// Anonymous user from other website, like this: https://www.zopim.com/
+	// Can be ==> [0x1 ... 0xF]
+	T_ROOM = uint64(0)
+	T_USER = uint64(0x1<<60) // Register user
+	T_VISITOR = uint64(0x2<<60) // Anonymous user from other website, the pattern will be like this: https://www.zopim.com/
 )
 type Message struct {
-	from_type, to_type int	// aka. Client.utype
-	from_id,   to_id   uint	// client.id ==> room.id
+	from_type, to_type uint64	// aka. Client.utype
+	from_id,   to_id   uint64	// client.id ==> room.id
 	body string
 	created_at time.Time
 }
@@ -83,16 +84,77 @@ type Query struct {
 }
 
 /*============================================================================
- * Data access:
+ * [DATA ACCESS]:
  *     Receive some arguments then send a map[string]interface{} back
+ *
+ * 
+ * Session: (User1, User2) or (User2, User1)
+ *    Session.id = encodeSessionId(User1.type, User1.id, User2.type, User2.id)
+ *
+ * Special query requirements (Pagination required):
+ * ------------------------------------------------
+ *   1. [Get] 通过获取某房间的所有消息记录.
+ *        (Room.id) ==> []*Message
+ *   2. [Get] 获取和某用户的所有消息记录.
+ *        (UserMe.utype, UserMe.id, UserOther.utype, UserOther.id) ==> []*Message
+ *   3. [Search] 通过注册用户的用户名或匿名用户的位置搜索用户
+ *        (Ruser.name || Vuser.location) ==> []*User
+ *   4. [Search] 通过消息内容搜索所有和我相关的消息
+ *        (UserMe.utype, UserMe.id, Message.body) ==> []*Message
  *==========================================================================*/
+
+var reverseBits = [...]uint64 {
+	0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0, 0x10, 0x90, 0x50, 0xD0, 0x30, 0xB0, 0x70, 0xF0, 
+	0x08, 0x88, 0x48, 0xC8, 0x28, 0xA8, 0x68, 0xE8, 0x18, 0x98, 0x58, 0xD8, 0x38, 0xB8, 0x78, 0xF8, 
+	0x04, 0x84, 0x44, 0xC4, 0x24, 0xA4, 0x64, 0xE4, 0x14, 0x94, 0x54, 0xD4, 0x34, 0xB4, 0x74, 0xF4, 
+	0x0C, 0x8C, 0x4C, 0xCC, 0x2C, 0xAC, 0x6C, 0xEC, 0x1C, 0x9C, 0x5C, 0xDC, 0x3C, 0xBC, 0x7C, 0xFC, 
+	0x02, 0x82, 0x42, 0xC2, 0x22, 0xA2, 0x62, 0xE2, 0x12, 0x92, 0x52, 0xD2, 0x32, 0xB2, 0x72, 0xF2, 
+	0x0A, 0x8A, 0x4A, 0xCA, 0x2A, 0xAA, 0x6A, 0xEA, 0x1A, 0x9A, 0x5A, 0xDA, 0x3A, 0xBA, 0x7A, 0xFA,
+	0x06, 0x86, 0x46, 0xC6, 0x26, 0xA6, 0x66, 0xE6, 0x16, 0x96, 0x56, 0xD6, 0x36, 0xB6, 0x76, 0xF6, 
+	0x0E, 0x8E, 0x4E, 0xCE, 0x2E, 0xAE, 0x6E, 0xEE, 0x1E, 0x9E, 0x5E, 0xDE, 0x3E, 0xBE, 0x7E, 0xFE,
+	0x01, 0x81, 0x41, 0xC1, 0x21, 0xA1, 0x61, 0xE1, 0x11, 0x91, 0x51, 0xD1, 0x31, 0xB1, 0x71, 0xF1,
+	0x09, 0x89, 0x49, 0xC9, 0x29, 0xA9, 0x69, 0xE9, 0x19, 0x99, 0x59, 0xD9, 0x39, 0xB9, 0x79, 0xF9, 
+	0x05, 0x85, 0x45, 0xC5, 0x25, 0xA5, 0x65, 0xE5, 0x15, 0x95, 0x55, 0xD5, 0x35, 0xB5, 0x75, 0xF5,
+	0x0D, 0x8D, 0x4D, 0xCD, 0x2D, 0xAD, 0x6D, 0xED, 0x1D, 0x9D, 0x5D, 0xDD, 0x3D, 0xBD, 0x7D, 0xFD,
+	0x03, 0x83, 0x43, 0xC3, 0x23, 0xA3, 0x63, 0xE3, 0x13, 0x93, 0x53, 0xD3, 0x33, 0xB3, 0x73, 0xF3, 
+	0x0B, 0x8B, 0x4B, 0xCB, 0x2B, 0xAB, 0x6B, 0xEB, 0x1B, 0x9B, 0x5B, 0xDB, 0x3B, 0xBB, 0x7B, 0xFB,
+	0x07, 0x87, 0x47, 0xC7, 0x27, 0xA7, 0x67, 0xE7, 0x17, 0x97, 0x57, 0xD7, 0x37, 0xB7, 0x77, 0xF7, 
+	0x0F, 0x8F, 0x4F, 0xCF, 0x2F, 0xAF, 0x6F, 0xEF, 0x1F, 0x9F, 0x5F, 0xDF, 0x3F, 0xBF, 0x7F, 0xFF,
+}
+
+func reverseId(id uint64) (uint64) {
+	result := (reverseBits[ id        & 0xff] << 56) |
+		  (reverseBits[(id >>  8) & 0xff] << 48) | 
+		  (reverseBits[(id >> 16) & 0xff] << 40) | 
+		  (reverseBits[(id >> 24) & 0xff] << 32) | 
+		  (reverseBits[(id >> 32) & 0xff] << 24) |
+		  (reverseBits[(id >> 40) & 0xff] << 16) | 
+		  (reverseBits[(id >> 48) & 0xff] <<  8) | 
+		  (reverseBits[(id >> 56) & 0xff])
+	return result >> 4
+}
+func reverseType(t uint64) (uint64) { return reverseBits[(t >> 60) & 0xff] << 56 }
+
+func hash2(typeA, idA uint64) (uint64) { return idA & typeA }
+func hashStrict(typeA, idA, typeZ, idZ uint64) (uint64) {
+	return reverseType(typeA) & typeZ & reverseId(idA) & idZ
+}
+func encodeSessionId(typeA, idA, typeZ, idZ uint64) (uint64) {
+	// Sort
+	if typeA > typeZ { typeA, typeZ = typeZ, typeA }
+	if idA > idZ { idA, idZ = idZ, idA }
+	return hashStrict(idA, typeA, idZ, typeZ)
+}
+func decodeSessionId(sid, my uint64) (typeA, idA, typeZ, idZ uint64) { return }
+
+
 func db() {
 	println("[Starting] db() ......")
 
 	// The data
-	clients := make(map[uint]*Client)
+	clients := make(map[uint64]*Client)
 	clientTokens := make(map[string]*Client)
-	rooms := make(map[uint]*Room)
+	rooms := make(map[uint64]*Room)
 	
 	roomNames := [...]string{
 		"Japan", "China", "U.S.", "Russia", "U.K.",
@@ -100,12 +162,12 @@ func db() {
 	}			// tmp variable
 	for id, name := range roomNames {
 		room := &Room{
-			id		: uint(id),
+			id		: uint64(id),
 			name		: name,
-			members		: make(map[uint]*Client),
+			members		: make(map[uint64]*Client),
 			history		: make([]*Message, 0, 20),
 		}
-		rooms[uint(id)] = room
+		rooms[uint64(id)] = room
 	}
 	
 	for query := range dbQuerys {
@@ -116,11 +178,11 @@ func db() {
 		case Q_NEW_CLIENT:
 			clientCnt++
 			client := new(Client)
-			client.id = clientCnt
+			client.id = uint64(clientCnt)
 			client.utype = T_USER
 			client.name = fmt.Sprintf("name-%d", clientCnt)
 			client.token = fmt.Sprintf("token-%d", clientCnt)
-			client.rooms = make(map[uint]*Room)
+			client.rooms = make(map[uint64]*Room)
 			clientTokens[client.token] = client
 			data = client
 			
@@ -168,7 +230,7 @@ func db() {
 			data = sl
 			
 		case Q_MEMBERS:
-			rid := uint(query.params.(float64))
+			rid := uint64(query.params.(float64))
 			members := rooms[rid].members
 			idx := 0
 			sl := make([](map[string]interface{}), len(members))
@@ -183,12 +245,12 @@ func db() {
 			fmt.Printf("[Q_MEMBERS] members: %v\n", rooms[rid].members)
 			
 		case Q_HISTORY:
-			rid := uint(query.params.(float64))
+			rid := uint64(query.params.(float64))
 			room := rooms[rid]
 			history := room.history
 			println("[Q_HISTORY]: len(history)", len(history))
 			messages := make([](map[string]interface{}), len(history))
-			for i := uint(0); i < uint(len(history)); i++ {
+			for i := uint64(0); i < uint64(len(history)); i++ {
 				messages[i] = map[string]interface{} {
 					"from_type"	: TYPE_MAP[history[i].from_type],
 					"from_id"	: history[i].from_id,
@@ -202,7 +264,7 @@ func db() {
 			
 		case Q_JOIN:
 			params := query.params.(map[string]interface{})
-			rid := uint(params["oid"].(float64))
+			rid := uint64(params["oid"].(float64))
 			client := params["client"].(*Client)
 			room := rooms[rid]
 
@@ -227,7 +289,7 @@ func db() {
 
 		case Q_LEAVE:
 			params := query.params.(map[string]interface{})
-			rid := uint(params["oid"].(float64))
+			rid := uint64(params["oid"].(float64))
 			client := params["client"].(*Client)
 			room := rooms[rid] 
 			delete(client.rooms, rid)
@@ -250,7 +312,7 @@ func db() {
 			
 		case Q_MESSAGE:
 			params := query.params.(map[string]interface{})
-			rid := uint(params["to_id"].(float64))			
+			rid := uint64(params["to_id"].(float64))			
 			client := params["client"].(*Client)
 			body := params["body"].(string)
 			created_at := params["created_at"].(time.Time)
@@ -479,7 +541,7 @@ func ChatHandler(ws *websocket.Conn) {
 func main() {
 
 	// Init vars
-	TYPE_MAP = map[int]string {
+	TYPE_MAP = map[uint64]string {
 		T_ROOM : "room",
 		T_USER : "user",
 		T_VISITOR : "visitor",
