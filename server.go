@@ -86,11 +86,11 @@ type Query struct {
 /*============================================================================
  * [DATA ACCESS]:
  *     Receive some arguments then send a map[string]interface{} back
- *
- * 
+ 
+  
  * Session: (User1, User2) or (User2, User1)
  *    Session.id = encodeSessionId(User1.type, User1.id, User2.type, User2.id)
- *
+ 
  * Special query requirements (Pagination required):
  * ------------------------------------------------
  *   1. [Get] 通过获取某房间的所有消息记录.
@@ -101,6 +101,13 @@ type Query struct {
  *        (Ruser.name || Vuser.location) ==> []*User
  *   4. [Search] 通过消息内容搜索所有和我相关的消息
  *        (UserMe.utype, UserMe.id, Message.body) ==> []*Message
+
+ * 哪些是非常频繁的操作?
+ * --------------------
+ *   1. 更新在线用户列表 ==> 可以伸缩的定长数组
+ *   2. 更新房间的成员列表 ==> 可以伸缩的定长数组
+ *   3. 新增消息 ==> 不得不放数据库并建好索引
+ *   4. 获取房间或Session的历史记录 ==> 不得不放数据库并建好索引
  *==========================================================================*/
 
 var reverseBits = [...]uint64 {
