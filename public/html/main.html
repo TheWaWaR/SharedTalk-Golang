@@ -1,20 +1,44 @@
 
 <div class="container">
-  <h3><img ng-src="http://www.gravatar.com/avatar/{{user.oid}}?s=20&d=identicon&f=y" /> {{ user.name }}</h3>
-  <hr />
-  
   <div class="col-sm-2">
-    <ul class="nav nav-pills nav-stacked"
-        style="border-left: 1px solid #DDDDDD; padding-left:5px;">
-      <li ng-repeat="(rid, room) in rooms" ng-if="!room.joined">
-        <a href=""
-           ng-click="toggleRoom(room.oid)">{{room.name}}</a>
-      </li>
-    </ul>
+    <h3><img ng-src="http://www.gravatar.com/avatar/{{user.oid}}?s=20&d=identicon&f=y" /> {{ user.name }}</h3>
+    <hr style="border-style:dashed;" />
+
+    <div id="section-selector" class="btn-group" style="width:100%;">
+      <button ng-repeat="(k, sect) in sections"
+              ng-click="changeSection(k)"
+              type="button"
+              id="btn-{{sect.name}}" class="btn btn-sm btn-primary"
+              style="width:33%;"
+              title="{{sect.title}}"
+              data-toggle="tooltip"
+              data-placement="{{sect.placement}}">
+        <i class="fa {{sect.icon}}"></i>
+      </button>
+    </div>
+
+    <div ng-switch on="curSection">
+      <ul ng-switch-when="rooms" class="nav nav-pills nav-stacked"
+          style="border-left: 1px dashed #DDDDDD; padding-left:5px; margin-top: 10px;">
+        <li ng-repeat="(rid, room) in rooms" ng-if="!room.joined">
+          <a href=""
+             ng-click="toggleRoom(room.oid)">{{room.name}}</a>
+        </li>
+      </ul>
+      <ul ng-switch-when="users" class="nav nav-pills nav-stacked"
+          style="border-left: 1px dashed #DDDDDD; padding-left:5px; margin-top: 10px;">
+        <label class="label label-warning">TODO:</label> Users.
+      </ul>
+      <ul ng-switch-when="visitors" class="nav nav-pills nav-stacked"
+          style="border-left: 1px dashed #DDDDDD; padding-left:5px; margin-top: 10px;">
+        <label class="label label-warning">TODO:</label> Visitors.
+      </ul>
+
+    </div> 
   </div>
 
   <div class="col-sm-10">
-    <div class="row">
+    <div class="row" style="padding-top:25px;">
       <div ng-if="joinedSize>0" >
         <ul id="room-tabs" class="nav nav-tabs" style="margin-bottom: 20px;">
           <li ng-repeat="(rid, _b) in joinedRooms"
@@ -42,15 +66,17 @@
             <div class="">
               <div class="row">
                 <div class="col-sm-9">
-                  <div id="room-{{room.oid}}" class="well">
-                    <div class="message" ng-repeat="message in history[room.oid]">
-                      <span class="time">[ {{ message.created_at }} ]</span>
-                      <img ng-src="http://www.gravatar.com/avatar/{{message.from_id}}?s=12&d=identicon&f=y" /> : {{ message.body }}
-                    </div>
+                  <div id="room-{{room.oid}}-messages" class="well" style="height:450px;overflow:scroll;">
+                    <div class="messages">
+                      <div class="message" ng-repeat="message in history[room.oid]">
+                        <span class="time">[ {{ message.created_at }} ]</span>
+                        <img ng-src="http://www.gravatar.com/avatar/{{message.from_id}}?s=12&d=identicon&f=y" /> : {{ message.body }}
+                      </div>
+                    </div> <!-- .messages -->
                   </div>
                   <hr />
                   <form ng-submit="send('room', room.oid)">
-                    <input id="message-input-{{room.oid}}" class="form-control input-sm" 
+                    <input id="message-input-{{room.oid}}" class="form-control input-sm"
                            type="text" ng-model="text" placeholder="Enter Message">
                   </form>
                 </div>
@@ -66,13 +92,12 @@
           </div>   <!-- .tab-pane -->
         </div> <!-- .tab-content -->
       </div> <!-- .room-tabs -->
-      
+
       <div ng-if="joinedSize==0">
         <div class="well"> Welcome! </div>
       </div>
 
     </div> <!-- .row -->
-    
+
   </div> <!-- .col-sm-10 -->
-</div>
 </div> <!-- .container -->

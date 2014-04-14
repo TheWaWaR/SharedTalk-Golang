@@ -99,6 +99,27 @@
       $scope.users = {};
       $scope.visitors = {};
       $scope.currentRid = null;
+      $scope.sections = {
+        rooms: {
+          name: "rooms",
+          title: "Rooms",
+          placement: "left",
+          icon: "fa-group"
+        },
+        users: {
+          name: "users",
+          title: "Users",
+          placement: "top",
+          icon: "fa-user"
+        },
+        visitors: {
+          name: "visitors",
+          title: "Visitors",
+          placement: "right",
+          icon: "fa-male"
+        }
+      };
+      $scope.curSection = "rooms";
       $scope.send = function(type, oid) {
         var body, msg;
         body = this.text;
@@ -112,6 +133,13 @@
           console.log('send:', msg);
           ws.send(JSON.stringify(msg));
           return this.text = "";
+        }
+      };
+      $scope.changeSection = function(key) {
+        if (key in $scope.sections) {
+          return $scope.curSection = key;
+        } else {
+          return console.log("changeSection.errorKey:", key);
         }
       };
       $scope.showTab = function(rid) {
@@ -155,7 +183,7 @@
         return console.log('Opened');
       });
       ChatService.setOnmessage(function(event) {
-        var data, member, msg, rid, room, v, _i, _j, _k, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3;
+        var containerId, data, member, msg, rid, room, v, _i, _j, _k, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3;
         data = JSON.parse(event.data);
         console.log('<<DATA>>:', data);
         switch (data.path) {
@@ -285,6 +313,11 @@
                 }
                 console.log($("#rtab-" + data.to_id + " .notifier"), $scope.currentRid, data.to_id);
                 $scope.history[data.to_id].push(data);
+                containerId = "#room-" + data.to_id + "-messages";
+                $(containerId).animate({
+                  scrollTop: $(containerId).scrollTop() + $("" + containerId + " .message:last").height()
+                });
+                console.log($("" + containerId + " .message:last").offset().top);
             }
             console.log('Message.type:', data.to_type);
         }

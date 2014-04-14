@@ -6,7 +6,7 @@ initTabs = () ->
 
     $("#room-tabs a:first").tab "show";
 
-    
+
 showTab = (selector) ->
     $tab = $(selector)
     $tab.tab "show"
@@ -33,6 +33,7 @@ loadJoined = () ->
 saveJoined = (joinedRooms) ->
     rids = (rid for rid, v of joinedRooms)
     $.cookie("room-ids", rids)
+
 
 
 # Angular things
@@ -72,6 +73,12 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
     $scope.users = {}           # user.id : [user, ...]
     $scope.visitors = {}        # visitor.id : [visitor, ...]
     $scope.currentRid = null
+    $scope.sections = {
+        rooms: {name:"rooms", title:"Rooms", placement:"left", icon:"fa-group"},
+        users: {name:"users", title:"Users", placement:"top", icon:"fa-user"},
+        visitors: {name:"visitors", title:"Visitors", placement:"right", icon:"fa-male"},
+    }
+    $scope.curSection = "rooms"
 
     # Function for pages
     $scope.send = (type, oid) ->
@@ -84,6 +91,12 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
             # $('#message-input-'+id).val ""
             this.text = ""
 
+    $scope.changeSection = (key) ->
+        if key of $scope.sections
+            $scope.curSection = key
+        else
+            console.log "changeSection.errorKey:", key
+    
     $scope.showTab = (rid) ->
         console.log "$scope.showTab:", rid
         $scope.currentRid = rid
@@ -212,7 +225,10 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
                             $("#rtab-#{data.to_id} .notifier").removeClass "hide"
                         console.log $("#rtab-#{data.to_id} .notifier"), $scope.currentRid, data.to_id
                         $scope.history[data.to_id].push data
-                        # $('#room-'+data.oid).append "#{data.from}: #{data.body}<br />"
+                        
+                        containerId = "#room-#{data.to_id}-messages"
+                        $(containerId).animate {scrollTop: $(containerId).scrollTop() + $("#{containerId} .message:last").height()}
+                        console.log $("#{containerId} .message:last").offset().top
                 console.log 'Message.type:', data.to_type
 
         $scope.$apply()
