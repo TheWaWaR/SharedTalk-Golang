@@ -316,6 +316,8 @@
                 containerId = "#room-" + data.to_id + "-messages";
                 $(containerId).animate({
                   scrollTop: $(containerId).scrollTop() + $("" + containerId + " .message:last").height()
+                }, {
+                  duration: 200
                 });
                 console.log($("" + containerId + " .message:last").offset().top);
             }

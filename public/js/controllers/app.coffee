@@ -227,7 +227,7 @@ chatApp.controller "Ctrl", ['$scope', 'ChatService', ($scope, ChatService) ->
                         $scope.history[data.to_id].push data
                         
                         containerId = "#room-#{data.to_id}-messages"
-                        $(containerId).animate {scrollTop: $(containerId).scrollTop() + $("#{containerId} .message:last").height()}
+                        $(containerId).animate {scrollTop: $(containerId).scrollTop() + $("#{containerId} .message:last").height()}, {duration: 200}
                         console.log $("#{containerId} .message:last").offset().top
                 console.log 'Message.type:', data.to_type
 
