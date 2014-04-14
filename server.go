@@ -1,4 +1,3 @@
-
 package main
 
 // TODO:
@@ -53,7 +52,7 @@ type Room struct {
 
 // Sender/Receiver types (::TODO)
 const (
-	// Can be ==> [0x1 ... 0xF]
+	// Can be ==> [0x0 ... 0xF]
 	T_ROOM = uint64(0)
 	T_USER = uint64(0x1<<60) // Register user
 	T_VISITOR = uint64(0x2<<60) // Anonymous user from other website, the pattern will be like this: https://www.zopim.com/
