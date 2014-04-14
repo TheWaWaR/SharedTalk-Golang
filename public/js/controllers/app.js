@@ -319,7 +319,6 @@
                 }, {
                   duration: 200
                 });
-                console.log($("" + containerId + " .message:last").offset().top);
             }
             console.log('Message.type:', data.to_type);
         }
