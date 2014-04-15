@@ -243,16 +243,18 @@
             initTabs();
             break;
           case 'join':
-            msg = {
-              path: 'members',
-              oid: data.oid
-            };
-            ws.send(JSON.stringify(msg));
-            console.log('Joined:', data);
-            $scope.rooms[data.oid].joined = true;
-            $scope.joinedRooms[data.oid] = true;
-            $scope.joinedSize += 1;
-            saveJoined($scope.joinedRooms);
+            if (data.oid !== null) {
+              msg = {
+                path: 'members',
+                oid: data.oid
+              };
+              ws.send(JSON.stringify(msg));
+              console.log('Joined:', data);
+              $scope.rooms[data.oid].joined = true;
+              $scope.joinedRooms[data.oid] = true;
+              $scope.joinedSize += 1;
+              saveJoined($scope.joinedRooms);
+            }
             break;
           case 'leave':
             delete $scope.members[data.oid];

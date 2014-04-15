@@ -427,11 +427,13 @@ func history(req map[string]interface{}, resp *map[string]interface{}) {
 
 func join(req map[string]interface{}, resp *map[string]interface{}) {
 	rid := req["oid"]
-	params := map[string]interface{} {
-		"client": req["client"],
-		"oid": rid,
+	if rid != nil {
+		params := map[string]interface{} {
+			"client": req["client"],
+			"oid": rid,
+		}
+		dbQuerys <- &Query{Q_JOIN, params, nil}
 	}
-	dbQuerys <- &Query{Q_JOIN, params, nil}
 	(*resp)["oid"] = rid
 }
 
