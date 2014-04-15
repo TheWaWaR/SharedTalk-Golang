@@ -66,7 +66,7 @@
             <div class="">
               <div class="row">
                 <div class="col-sm-9">
-                  <div id="room-{{room.oid}}-messages" class="well" style="height:450px;overflow:scroll;">
+                  <div id="room-{{room.oid}}-messages" class="well" style="height:450px;overflow:auto;">
                     <div class="messages">
                       <div class="message" ng-repeat="message in history[room.oid]">
                         <span class="time">[ {{ message.created_at }} ]</span>
