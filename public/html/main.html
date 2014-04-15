@@ -1,5 +1,5 @@
 
-<div class="container">
+<div class="container" >
   <div class="col-sm-2">
     <h3><img ng-src="http://www.gravatar.com/avatar/{{user.oid}}?s=20&d=identicon&f=y" /> {{ user.name }}</h3>
     <hr style="border-style:dashed;" />
@@ -9,7 +9,7 @@
               ng-click="changeSection(k)"
               type="button"
               id="btn-{{sect.name}}" class="btn btn-sm btn-primary"
-              style="width:33%;"
+              style="width:33.33%;"
               title="{{sect.title}}"
               data-toggle="tooltip"
               data-placement="{{sect.placement}}">
@@ -19,18 +19,18 @@
 
     <div ng-switch on="curSection">
       <ul ng-switch-when="rooms" class="nav nav-pills nav-stacked"
-          style="border-left: 1px dashed #DDDDDD; padding-left:5px; margin-top: 10px;">
+          style="box-shadow:0 0 4px rgba(0, 0, 0, 0.2); margin-top: 15px;">
         <li ng-repeat="(rid, room) in rooms" ng-if="!room.joined">
           <a href=""
              ng-click="toggleRoom(room.oid)">{{room.name}}</a>
         </li>
       </ul>
       <ul ng-switch-when="users" class="nav nav-pills nav-stacked"
-          style="border-left: 1px dashed #DDDDDD; padding-left:5px; margin-top: 10px;">
+          style="box-shadow:0 0 4px rgba(0, 0, 0, 0.2); margin-top: 15px; padding: 15px;">
         <label class="label label-warning">TODO:</label> Users.
       </ul>
       <ul ng-switch-when="visitors" class="nav nav-pills nav-stacked"
-          style="border-left: 1px dashed #DDDDDD; padding-left:5px; margin-top: 10px;">
+          style="box-shadow:0 0 4px rgba(0, 0, 0, 0.2); margin-top: 15px; padding: 15px;">
         <label class="label label-warning">TODO:</label> Visitors.
       </ul>
 
@@ -66,7 +66,8 @@
             <div class="">
               <div class="row">
                 <div class="col-sm-9">
-                  <div id="room-{{room.oid}}-messages" class="well" style="height:450px;overflow:auto;">
+                  <div id="room-{{room.oid}}-messages" class="well"
+                       style="height:450px; background:#FFF; overflow:auto;">
                     <div class="messages">
                       <div class="message" ng-repeat="message in history[room.oid]">
                         <span class="time">[ {{ message.created_at }} ]</span>
@@ -75,7 +76,9 @@
                     </div> <!-- .messages -->
                   </div>
                   <form ng-submit="send('room', room.oid)">
-                    <input id="message-input-{{room.oid}}" class="form-control input-sm"
+                    <input id="message-input-{{room.oid}}"
+                           class="form-control input-sm"
+                           style="box-shadow:0 0 4px rgba(0, 0, 0, 0.2);"
                            type="text" ng-model="text" placeholder="Enter Message">
                   </form>
                 </div>
